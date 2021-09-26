@@ -1,6 +1,7 @@
 import {Post} from './entities/Post';
 import {MikroORM} from '@mikro-orm/core';
 import path from 'path';
+import {User} from './entities/User';
 
 // export default {
 // 	migrations: {
@@ -26,5 +27,5 @@ export default {
 	host: 'localhost',
 	port: 5432,
 	user: 'postgres',
-	entities: [Post]
+	entities: [Post, User]
 } as Parameters<typeof MikroORM.init>[0];
