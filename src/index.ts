@@ -1,6 +1,8 @@
 import 'reflect-metadata';
 import 'colors';
 import path from 'path';
+import fs from 'fs';
+import https from 'https';
 import {MikroORM} from '@mikro-orm/core';
 import dotenv from 'dotenv';
 dotenv.config({path: path.join(__dirname, '../', 'config', 'config.env')});
@@ -10,7 +12,7 @@ import {ApolloServer} from 'apollo-server-express';
 import session from 'express-session';
 import ConnectRedis from 'connect-redis';
 import redis from 'redis';
-import cors from 'cors';
+// import cors from 'cors';
 import {ApolloServerPluginLandingPageGraphQLPlayground} from 'apollo-server-core';
 import users from './routes/users';
 import {buildSchema} from 'type-graphql';
@@ -26,7 +28,7 @@ const main = async () => {
 		const orm = await MikroORM.init(mikroConfig);
 		await orm.getMigrator().up();
 		const app = express();
-		app.use(cors());
+		// app.use(cors());
 
 		app.use(
 			session({
@@ -37,9 +39,10 @@ const main = async () => {
 				store: new RedisStore({client: redisClient, disableTouch: true}),
 				cookie: {
 					maxAge: 1000 * 60 * 60 * 24 * 365,
-					httpOnly: true,
-					secure: process.env.NODE_ENV === 'production',
-					sameSite: 'lax'
+					// httpOnly: true,
+					// secure: process.env.NODE_ENV === 'production',
+					secure: true,
+					sameSite: 'none'
 				}
 			})
 		);
@@ -54,14 +57,22 @@ const main = async () => {
 		});
 
 		await apolloServer.start();
-		apolloServer.applyMiddleware({app, cors: false});
+		apolloServer.applyMiddleware({app, cors: {origin: ['*', 'http://localhost:3000'], credentials: true}});
 
 		app.use('/api/v1/users', users);
 
 		const port = process.env.PORT || 5001;
 		const mode = process.env.NODE_ENV || 'DEFAULT';
 
-		app.listen(port, () => console.log(`Express server running on port ${port}, in ${mode} mode`.cyan.underline.bold));
+		https
+			.createServer(
+				{
+					key: fs.readFileSync(path.join(__dirname, '../', 'server.key')),
+					cert: fs.readFileSync(path.join(__dirname, '../', 'server.cert'))
+				},
+				app
+			)
+			.listen(port, () => console.log(`Express server running on port ${port}, in ${mode} mode`.cyan.underline.bold));
 	} catch (err) {
 		console.error(err);
 	}
