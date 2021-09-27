@@ -1,10 +1,39 @@
 import {User} from '../entities/User';
-import {Arg, Ctx, Int, Mutation, Query, Resolver} from 'type-graphql';
+import {Arg, Ctx, Field, Int, Mutation, ObjectType, Query, Resolver} from 'type-graphql';
 import {MyContext} from 'src/types';
-import bcrypt from 'bcryptjs';
+import argon2 from 'argon2';
+const errorObj = {field: 'credentials', message: 'Not Authorized'};
+
+@ObjectType()
+class FieldError {
+	@Field()
+	field: string;
+
+	@Field()
+	message: string;
+}
+
+@ObjectType()
+class UserResponse {
+	@Field(() => [FieldError], {nullable: true})
+	errors?: FieldError[];
+
+	@Field(() => User, {nullable: true})
+	user?: User;
+}
 
 @Resolver()
 export class UserResolver {
+	@Query(() => User, {nullable: true})
+	async me(@Ctx() {req, em}: MyContext) {
+		if (!req.session.userId) {
+			return null;
+		}
+
+		const meUser = await em.findOne(User, {id: req.session.userId});
+		return meUser;
+	}
+
 	@Query(() => [User])
 	users(@Ctx() ctx: MyContext): Promise<User[]> {
 		const theUsers = ctx.em.find(User, {});
@@ -14,16 +43,54 @@ export class UserResolver {
 	@Query(() => User, {nullable: true})
 	user(@Ctx() ctx: MyContext, @Arg('id', () => Int) id: number) {
 		const theUser = ctx.em.findOne(User, {id});
-		console.log('hey');
 		return theUser;
 	}
 
-	@Mutation(() => User, {nullable: true})
-	async createUser(@Ctx() ctx: MyContext, @Arg('username', () => String) username: string, @Arg('password', () => String) password: string): Promise<User | null> {
-		const hash = await bcrypt.hash(password, 10);
-		const newUser = ctx.em.create(User, {username, password: hash});
-		await ctx.em.persistAndFlush(newUser);
-		return newUser;
+	@Mutation(() => UserResponse, {nullable: true})
+	async register(@Ctx() {em, req}: MyContext, @Arg('username', () => String) username: string, @Arg('password', () => String) password: string): Promise<UserResponse> {
+		try {
+			if (username.length <= 2) {
+				return {
+					errors: [{field: 'username', message: 'The username must be 2 characters or greater'}]
+				};
+			}
+			if (password.length < 6) {
+				return {
+					errors: [{field: 'password', message: 'The password must be 6 characters or greater'}]
+				};
+			}
+			const hash = await argon2.hash(password);
+			const newUser = em.create(User, {username, password: hash});
+			await em.persistAndFlush(newUser);
+			req.session.userId = newUser.id;
+			return {user: newUser};
+		} catch (err) {
+			console.error(err);
+			if (err.code === '23505') {
+				return {errors: [{field: 'register', message: `Username ${username} is already in use`}]};
+			}
+			return {errors: [{field: 'register', message: `A registration attempt for the username ${username} was unsuccessful`}]};
+		}
+	}
+
+	@Mutation(() => UserResponse, {nullable: true})
+	async login(@Ctx() {em, req}: MyContext, @Arg('username', () => String) username: string, @Arg('password', () => String) password: string): Promise<UserResponse> {
+		const user = await em.findOne(User, {username});
+		if (!user) {
+			return {
+				errors: [errorObj]
+			};
+		}
+
+		const isMatch = await argon2.verify(user.password, password);
+		if (!isMatch) {
+			return {
+				errors: [errorObj]
+			};
+		}
+
+		req.session.userId = user.id;
+		return {user};
 	}
 
 	@Mutation(() => User, {nullable: true})

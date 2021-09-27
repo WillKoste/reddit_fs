@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import 'colors';
 import path from 'path';
 import {MikroORM} from '@mikro-orm/core';
 import dotenv from 'dotenv';
@@ -6,29 +7,54 @@ dotenv.config({path: path.join(__dirname, '../', 'config', 'config.env')});
 import mikroConfig from './mikro-orm.config';
 import express from 'express';
 import {ApolloServer} from 'apollo-server-express';
-import 'colors';
+import session from 'express-session';
+import ConnectRedis from 'connect-redis';
+import redis from 'redis';
+import cors from 'cors';
+import {ApolloServerPluginLandingPageGraphQLPlayground} from 'apollo-server-core';
 import users from './routes/users';
 import {buildSchema} from 'type-graphql';
 import {HelloResolver} from './resolvers/hello';
 import {PostResolver} from './resolvers/post';
 import {UserResolver} from './resolvers/user';
+import {MyContext} from './types';
+const RedisStore = ConnectRedis(session);
 
 const main = async () => {
 	try {
+		const redisClient = redis.createClient();
 		const orm = await MikroORM.init(mikroConfig);
 		await orm.getMigrator().up();
 		const app = express();
+		app.use(cors());
+
+		app.use(
+			session({
+				name: 'wid',
+				secret: process.env.SESSION_SECRET || 'JJ_Rowling_Rules]',
+				resave: false,
+				saveUninitialized: false,
+				store: new RedisStore({client: redisClient, disableTouch: true}),
+				cookie: {
+					maxAge: 1000 * 60 * 60 * 24 * 365,
+					httpOnly: true,
+					secure: process.env.NODE_ENV === 'production',
+					sameSite: 'lax'
+				}
+			})
+		);
 
 		const apolloServer = new ApolloServer({
 			schema: await buildSchema({
 				resolvers: [HelloResolver, PostResolver, UserResolver],
 				validate: false
 			}),
-			context: () => ({em: orm.em})
+			context: ({req, res}): MyContext => ({em: orm.em, req, res}),
+			plugins: [ApolloServerPluginLandingPageGraphQLPlayground()]
 		});
 
 		await apolloServer.start();
-		apolloServer.applyMiddleware({app});
+		apolloServer.applyMiddleware({app, cors: false});
 
 		app.use('/api/v1/users', users);
 
