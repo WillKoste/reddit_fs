@@ -9,7 +9,7 @@ const Navbar: React.FC<NavbarProps> = () => {
 	const [{data, fetching}] = useMeQuery();
 
 	return (
-		<Box bg='tomato' p={4} display='flex' alignItems='center' justifyContent='flex-end'>
+		<Box bg='thistle' p={4} display='flex' alignItems='center' justifyContent='flex-end'>
 			{fetching ? null : !data?.me ? (
 				<UnorderedList display='flex'>
 					<ListItem listStyleType='none' mx={1}>
@@ -30,7 +30,7 @@ const Navbar: React.FC<NavbarProps> = () => {
 							<Heading size='lg'>{data.me.username}</Heading>
 						</Box>
 					</UnorderedList>
-					<Button variant='link' mr={4}>
+					<Button variant='link' color='steelblue' mr={4}>
 						Logout
 					</Button>
 				</Fragment>
