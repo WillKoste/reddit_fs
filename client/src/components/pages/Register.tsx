@@ -1,13 +1,14 @@
 import React from 'react'
 import {Formik, Form} from 'formik'
-import {Button} from '@chakra-ui/react'
+import {Button, Heading} from '@chakra-ui/react'
 import Wrapper from '../layout/Wrapper'
 import InputField from '../layout/InputField'
 import { useRegisterMutation } from '../../generated/graphql'
 import { toErrorMap } from '../../utils/toErrorMap'
+import {History} from 'history'
 
 interface RegisterProps {
-  history: any
+  history: History
 }
 
 const Register: React.FC<RegisterProps> = ({history}) => {
@@ -16,15 +17,11 @@ const Register: React.FC<RegisterProps> = ({history}) => {
     password: '',
   }
 
-  const [{}, register] = useRegisterMutation()
-
-  const {username, password} = formData
-
-  console.log({history});
-  
+  const [{}, register] = useRegisterMutation()  
   
   return (
     <Wrapper variant="small">
+      <Heading as="h1" size="3xl" mb={8}>Login</Heading>
       <Formik initialValues={formData} onSubmit={async (values, {setErrors, setSubmitting}) => {
         const response = await register(values)
         if(response.data?.register?.errors){

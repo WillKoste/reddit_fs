@@ -2,6 +2,7 @@ import {User} from '../entities/User';
 import {Arg, Ctx, Field, Int, Mutation, ObjectType, Query, Resolver} from 'type-graphql';
 import {MyContext} from 'src/types';
 import argon2 from 'argon2';
+// import {EntityManager} from '@mikro-orm/postgresql';
 const errorObj = {field: 'credentials', message: 'Not Authorized'};
 
 @ObjectType()
@@ -61,13 +62,17 @@ export class UserResolver {
 			}
 			const hash = await argon2.hash(password);
 			const newUser = em.create(User, {username, password: hash});
+			//// QUERY BUILDER - IN CASE I EVER NEED IT \\\\
+			// const [user] = await (em as EntityManager).createQueryBuilder(User).getKnexQuery().insert({username, password: hash, createdAt: new Date(), updatedAt: new Date()}).returning('*');
 			await em.persistAndFlush(newUser);
 			req.session.userId = newUser.id;
 			return {user: newUser};
 		} catch (err) {
 			console.error(err);
 			if (err.code === '23505') {
-				return {errors: [{field: 'register', message: `Username ${username} is already in use`}]};
+				return {
+					errors: [{field: 'username', message: 'This username is already taken'}]
+				};
 			}
 			return {errors: [{field: 'register', message: `A registration attempt for the username ${username} was unsuccessful`}]};
 		}
