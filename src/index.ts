@@ -12,7 +12,7 @@ import {ApolloServer} from 'apollo-server-express';
 import session from 'express-session';
 import ConnectRedis from 'connect-redis';
 import redis from 'redis';
-// import cors from 'cors';
+import cors from 'cors';
 import {ApolloServerPluginLandingPageGraphQLPlayground} from 'apollo-server-core';
 import users from './routes/users';
 import {buildSchema} from 'type-graphql';
@@ -28,7 +28,7 @@ const main = async () => {
 		const orm = await MikroORM.init(mikroConfig);
 		await orm.getMigrator().up();
 		const app = express();
-		// app.use(cors());
+		app.use(cors({origin: ['*', 'http://localhost:3000'], credentials: true}));
 
 		app.use(
 			session({
@@ -57,7 +57,7 @@ const main = async () => {
 		});
 
 		await apolloServer.start();
-		apolloServer.applyMiddleware({app, cors: {origin: ['*', 'http://localhost:3000'], credentials: true}});
+		apolloServer.applyMiddleware({app, cors: false});
 
 		app.use('/api/v1/users', users);
 

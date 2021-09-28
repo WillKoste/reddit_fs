@@ -4,6 +4,7 @@ import {createClient, Provider} from 'urql'
 import {ThemeProvider, CSSReset, ColorModeProvider} from '@chakra-ui/react'
 import theme from './theme'
 import Register from './components/pages/Register';
+import Login from './components/pages/Login';
 const client = createClient({url: `https://127.0.0.1:5000/graphql`, fetchOptions: {credentials: 'include'}})
 
 const App = () => {
@@ -15,6 +16,7 @@ const App = () => {
 				<CSSReset />
 					<Switch>
 						<Route exact path="/register" component={Register} />
+						<Route exact path="/login" component={Login} />
 					</Switch>
 			</ColorModeProvider>
 		</ThemeProvider>
