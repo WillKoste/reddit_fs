@@ -5,7 +5,7 @@
 	"main": "index.tsx",
 	"scripts": {
 		"start": "node ./dist/index",
-		"server": "nodemon ./dist/index",
+		"server": "nodemon ./dist/src/index.js",
 		"client": "npm run start --prefix client",
 		"dev": "concurrently \"npm run server\" \"npm run client\"",
 		"watch": "tsc -w",
