@@ -13,7 +13,7 @@ interface LoginProps {
 
 const Login: React.FC<LoginProps> = ({history}) => {
 	const formData = {
-		username: '',
+		usernameOrEmail: '',
 		password: ''
 	};
 
@@ -38,7 +38,7 @@ const Login: React.FC<LoginProps> = ({history}) => {
 			>
 				{({handleSubmit, isSubmitting}) => (
 					<Form onSubmit={handleSubmit}>
-						<InputField name='username' label='Username' />
+						<InputField name='usernameOrEmail' label='Username or email' />
 						<InputField name='password' label='Password' type='password' />
 						<Button type='submit' display='block' w='100%' bg='blue.200' _hover={{bg: 'blue.300'}} isLoading={isSubmitting}>
 							Login

@@ -7,11 +7,12 @@ import {MikroORM} from '@mikro-orm/core';
 import dotenv from 'dotenv';
 dotenv.config({path: path.join(__dirname, '../', 'config', 'config.env')});
 import mikroConfig from './mikro-orm.config';
+import {COOKIE_NAME} from '../config/constants';
 import express from 'express';
 import {ApolloServer} from 'apollo-server-express';
 import session from 'express-session';
 import ConnectRedis from 'connect-redis';
-import redis from 'redis';
+import Redis from 'ioredis';
 import cors from 'cors';
 import {ApolloServerPluginLandingPageGraphQLPlayground} from 'apollo-server-core';
 import users from './routes/users';
@@ -19,24 +20,22 @@ import {buildSchema} from 'type-graphql';
 import {HelloResolver} from './resolvers/hello';
 import {PostResolver} from './resolvers/post';
 import {UserResolver} from './resolvers/user';
-import {MyContext} from './types';
 const RedisStore = ConnectRedis(session);
 
 const main = async () => {
 	try {
-		const redisClient = redis.createClient();
+		const redis = new Redis();
 		const orm = await MikroORM.init(mikroConfig);
 		await orm.getMigrator().up();
 		const app = express();
 		app.use(cors({origin: ['*', 'http://localhost:3000'], credentials: true}));
-
 		app.use(
 			session({
-				name: 'wid',
+				name: COOKIE_NAME,
 				secret: process.env.SESSION_SECRET || 'JJ_Rowling_Rules]',
 				resave: false,
 				saveUninitialized: false,
-				store: new RedisStore({client: redisClient, disableTouch: true}),
+				store: new RedisStore({client: redis, disableTouch: true}),
 				cookie: {
 					maxAge: 1000 * 60 * 60 * 24 * 365,
 					// httpOnly: true,
@@ -52,7 +51,7 @@ const main = async () => {
 				resolvers: [HelloResolver, PostResolver, UserResolver],
 				validate: false
 			}),
-			context: ({req, res}): MyContext => ({em: orm.em, req, res}),
+			context: ({req, res}) => ({em: orm.em, req, res, redis}),
 			plugins: [ApolloServerPluginLandingPageGraphQLPlayground()]
 		});
 

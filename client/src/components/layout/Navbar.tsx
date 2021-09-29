@@ -1,12 +1,13 @@
 import React, {Fragment} from 'react';
 import {Box, UnorderedList, ListItem, Heading, Button} from '@chakra-ui/react';
 import {NavLink} from 'react-router-dom';
-import {useMeQuery} from '../../generated/graphql';
+import {useLogoutMutation, useMeQuery} from '../../generated/graphql';
 
 interface NavbarProps {}
 
-const Navbar: React.FC<NavbarProps> = () => {
+const Navbar: React.FC<NavbarProps> = ({}) => {
 	const [{data, fetching}] = useMeQuery();
+	const [{fetching: logoutFetching}, logout] = useLogoutMutation();
 
 	return (
 		<Box bg='thistle' p={4} display='flex' alignItems='center' justifyContent='flex-end'>
@@ -30,7 +31,7 @@ const Navbar: React.FC<NavbarProps> = () => {
 							<Heading size='lg'>{data.me.username}</Heading>
 						</Box>
 					</UnorderedList>
-					<Button variant='link' color='steelblue' mr={4}>
+					<Button variant='link' color='steelblue' mr={4} onClick={() => logout()} isLoading={logoutFetching}>
 						Logout
 					</Button>
 				</Fragment>

@@ -2,8 +2,11 @@ import {User} from '../entities/User';
 import {Arg, Ctx, Field, Int, Mutation, ObjectType, Query, Resolver} from 'type-graphql';
 import {MyContext} from 'src/types';
 import argon2 from 'argon2';
-// import {EntityManager} from '@mikro-orm/postgresql';
-const errorObj = {field: 'credentials', message: 'Not Authorized'};
+import {validateRegister} from '../utils/validateRegister';
+import {sendEmail} from '../utils/sendEmail';
+const errorObj = {field: 'username', message: 'Not Authorized'};
+import {v4 as uuidv4} from 'uuid';
+import {COOKIE_NAME, FORGET_PASSWORD_PREFIX} from '../../config/constants';
 
 @ObjectType()
 class FieldError {
@@ -15,7 +18,7 @@ class FieldError {
 }
 
 @ObjectType()
-class UserResponse {
+export class UserResponse {
 	@Field(() => [FieldError], {nullable: true})
 	errors?: FieldError[];
 
@@ -48,20 +51,15 @@ export class UserResolver {
 	}
 
 	@Mutation(() => UserResponse, {nullable: true})
-	async register(@Ctx() {em, req}: MyContext, @Arg('username', () => String) username: string, @Arg('password', () => String) password: string): Promise<UserResponse> {
+	async register(@Ctx() {em, req}: MyContext, @Arg('username', () => String) username: string, @Arg('password', () => String) password: string, @Arg('email', () => String) email: string): Promise<UserResponse> {
 		try {
-			if (username.length <= 2) {
-				return {
-					errors: [{field: 'username', message: 'The username must be 2 characters or greater'}]
-				};
+			const response = validateRegister(username, password, email);
+			if (response) {
+				return response;
 			}
-			if (password.length < 6) {
-				return {
-					errors: [{field: 'password', message: 'The password must be 6 characters or greater'}]
-				};
-			}
+
 			const hash = await argon2.hash(password);
-			const newUser = em.create(User, {username, password: hash});
+			const newUser = em.create(User, {username, password: hash, email});
 			//// QUERY BUILDER - IN CASE I EVER NEED IT \\\\
 			// const [user] = await (em as EntityManager).createQueryBuilder(User).getKnexQuery().insert({username, password: hash, createdAt: new Date(), updatedAt: new Date()}).returning('*');
 			await em.persistAndFlush(newUser);
@@ -79,8 +77,8 @@ export class UserResolver {
 	}
 
 	@Mutation(() => UserResponse, {nullable: true})
-	async login(@Ctx() {em, req}: MyContext, @Arg('username', () => String) username: string, @Arg('password', () => String) password: string): Promise<UserResponse> {
-		const user = await em.findOne(User, {username});
+	async login(@Ctx() {em, req}: MyContext, @Arg('usernameOrEmail', () => String) usernameOrEmail: string, @Arg('password', () => String) password: string): Promise<UserResponse> {
+		const user = await em.findOne(User, usernameOrEmail.match(/^(([^<>()\[\]\.,;:\s@\"]+(\.[^<>()\[\]\.,;:\s@\"]+)*)|(\".+\"))@(([^<>()[\]\.,;:\s@\"]+\.)+[^<>()[\]\.,;:\s@\"]{2,})$/) ? {email: usernameOrEmail} : {username: usernameOrEmail});
 		if (!user) {
 			return {
 				errors: [errorObj]
@@ -96,6 +94,44 @@ export class UserResolver {
 
 		req.session.userId = user.id;
 		return {user};
+	}
+
+	@Mutation(() => Boolean)
+	logout(@Ctx() {req, res}: MyContext) {
+		return new Promise((resolve) =>
+			req.session.destroy((err) => {
+				if (err) {
+					console.error(err);
+					resolve(false);
+					return;
+				}
+				res.clearCookie(COOKIE_NAME);
+				resolve(true);
+			})
+		);
+	}
+
+	@Mutation(() => Boolean)
+	async forgotPassword(@Ctx() {em, redis}: MyContext, @Arg('email', () => String) email: string): Promise<Boolean> {
+		const theUser = await em.findOne(User, {email});
+		if (!theUser) {
+			return true;
+		}
+
+		const token: string = uuidv4();
+		await redis.set(FORGET_PASSWORD_PREFIX + token, theUser.id, 'ex', 1000 * 60 * 60 * 3);
+
+		sendEmail(
+			email,
+			`
+			<div>
+				<h1>Request to reset email</h1>
+				<p><a href="http://localhos:3000/change-password/${token}">Click here</a> to reset your password. you will be securely redirected to our site.</p>
+				<p>If you did not make this request, you do not need to do anything.</p>
+			</div>
+		`
+		);
+		return true;
 	}
 
 	@Mutation(() => User, {nullable: true})
